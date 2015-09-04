@@ -166,60 +166,57 @@ impl Tracer
 
         let mut pool = Pool::new(4);
         pool.scoped(|scope| {
-
-        for y in 0 .. h
-        {
-            println!("Rendering {} spp, {1:.3} %", samps*4, 100.0 * (y as f64)/(h as f64 - 1.0));
-            for x in 0 .. w
+            for y in 0 .. h
             {
-                let i = (h-y-1)*w+x;
-                for sy in 0 .. 2
-                {
-                    for sx in 0 .. 2
+                let mut c_ref = c.clone();
+                let cam_copy = cam_arc.clone();
+                scope.execute(move || {
+                    println!("Rendering {} spp, {1:.3} %", samps*4, 100.0 * (y as f64)/(h as f64 - 1.0));
+                    for x in 0 .. w
                     {
-                        let mut c_ref = c.clone();
-                        let cam_copy = cam_arc.clone();
-                        scope.execute(move ||
+                        let i = (h-y-1)*w+x;
+                        for sy in 0 .. 2
                         {
-                            let mut r = vector::Vector::new_zero();
-                            for _ in 0 .. samps
+                            for sx in 0 .. 2
                             {
-                                let r1 = 2.0 * self.generate_random_float();
-                                let dx = if r1 < 1.0 { r1.sqrt() - 1.0} else { 1.0 - (2.0 - r1).sqrt() };
-                                let r2 = 2.0 * self.generate_random_float();
-                                let dy = if r2 < 1.0 { r2.sqrt() - 1.0} else { 1.0 - (2.0 - r2).sqrt() };
+                                let mut r = vector::Vector::new_zero();
+                                for _ in 0 .. samps
+                                {
+                                    let r1 = 2.0 * self.generate_random_float();
+                                    let dx = if r1 < 1.0 { r1.sqrt() - 1.0} else { 1.0 - (2.0 - r1).sqrt() };
+                                    let r2 = 2.0 * self.generate_random_float();
+                                    let dy = if r2 < 1.0 { r2.sqrt() - 1.0} else { 1.0 - (2.0 - r2).sqrt() };
 
-                                let r1 = 0.0;
-                                let dx = 0.0;
-                                let r2 = 0.0;
-                                let dy = 0.0;
+                                    let r1 = 0.0;
+                                    let dx = 0.0;
+                                    let r2 = 0.0;
+                                    let dy = 0.0;
 
-                                let sxf64 : f64 = sx as f64;
-                                let syf64 : f64 = sy as f64;
+                                    let sxf64 : f64 = sx as f64;
+                                    let syf64 : f64 = sy as f64;
 
-                                let dxf64 : f64 = dx as f64;
-                                let dyf64 : f64 = dy as f64;
+                                    let dxf64 : f64 = dx as f64;
+                                    let dyf64 : f64 = dy as f64;
 
-                                let xf64 : f64 = x as f64;
-                                let yf64 : f64 = y as f64;
+                                    let xf64 : f64 = x as f64;
+                                    let yf64 : f64 = y as f64;
 
-                                let wf64 : f64 = w as f64;
-                                let hf64 : f64 = h as f64;
+                                    let wf64 : f64 = w as f64;
+                                    let hf64 : f64 = h as f64;
 
-                                let fx = ((sxf64 + 0.5 + dxf64)/2.0 + xf64)/wf64 - 0.5;
-                                let fy = ((syf64 + 0.5 + dyf64)/2.0 + yf64)/hf64 - 0.5;
-                                let d = cx * fx + cy * fy + cam_copy.d;
-                                r = r + self.radiance(&ray::Ray::new(cam_copy.o + d * 140.0, d.norm()))*(1.0/samps as f64);
+                                    let fx = ((sxf64 + 0.5 + dxf64)/2.0 + xf64)/wf64 - 0.5;
+                                    let fy = ((syf64 + 0.5 + dyf64)/2.0 + yf64)/hf64 - 0.5;
+                                    let d = cx * fx + cy * fy + cam_copy.d;
+                                    r = r + self.radiance(&ray::Ray::new(cam_copy.o + d * 140.0, d.norm()))*(1.0/samps as f64);
+                                }
+                                let mut c2 = c_ref.lock().unwrap();
+                                let new_value = c2[i as usize] + vector::Vector::new(clamp(r.x),clamp(r.y),clamp(r.z))* 0.25;
+                                c2[i as usize] = new_value;
                             }
-                            let mut c2 = c_ref.lock().unwrap();
-                            let new_value = c2[i as usize] + vector::Vector::new(clamp(r.x),clamp(r.y),clamp(r.z))* 0.25;
-                            c2[i as usize] = new_value;
-                        });
+                        }
                     }
-                }
+                });
             }
-        }
-
         });
         let w = c.lock().unwrap().clone();
         return w;
