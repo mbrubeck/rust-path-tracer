@@ -6,3 +6,4 @@ authors = ["cv"]
 
 [dependencies]
 rand = "0.3"
+scoped_threadpool = "0.1.6"

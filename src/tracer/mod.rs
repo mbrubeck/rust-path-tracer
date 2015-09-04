@@ -5,11 +5,11 @@ mod sphere;
 
 use rand;
 use rand::Rng;
+use scoped_threadpool::Pool;
 use std::f64::consts::PI;
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::sync::Arc;
-use std::thread;
 
 struct Tracer
 {
@@ -166,6 +166,9 @@ impl Tracer
         let c = Arc::new(Mutex::new(c_));
         let cam_arc = Arc::new(cam);
 
+        let mut pool = Pool::new(4);
+        pool.scoped(|scope| {
+
         for y in 0 .. h
         {
             println!("Rendering {} spp, {1:.3} %", samps*4, 100.0 * (y as f64)/(h as f64 - 1.0));
@@ -178,8 +181,8 @@ impl Tracer
                     {
                         let mut c_ref = c.clone();
                         let cam_copy = cam_arc.clone();
-                        //thread::spawn(move ||
-                        //{
+                        scope.execute(move ||
+                        {
                             let mut r = vector::Vector::new_zero();
                             for _ in 0 .. samps
                             {
@@ -213,11 +216,13 @@ impl Tracer
                             let mut c2 = c_ref.lock().unwrap();
                             let new_value = c2[i as usize] + vector::Vector::new(clamp(r.x),clamp(r.y),clamp(r.z))* 0.25;
                             c2[i as usize] = new_value;
-                        //});
+                        });
                     }
                 }
             }
         }
+
+        });
         let w = c.lock().unwrap().clone();
         return w;
     }
