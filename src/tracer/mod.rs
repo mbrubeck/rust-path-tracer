@@ -3,14 +3,10 @@ mod ray;
 mod refl;
 mod sphere;
 
-use rand;
 use rand::Rng;
 use rand::thread_rng;
 use scoped_threadpool::Pool;
 use std::f64::consts::PI;
-use std::cell::RefCell;
-use std::sync::Mutex;
-use std::sync::Arc;
 
 struct Tracer
 {
@@ -153,28 +149,19 @@ impl Tracer
         let cx = vector::Vector::new((w as f64) * 0.5135 / (h as f64), 0.0 , 0.0);
         let cy = (cx % cam.d).norm() * 0.5135;
 
-        let mut c_ = vec![];
-        for _ in 0 .. w
-        {
-            for _ in 0 .. h
-            {
-                c_.push(vector::Vector::new_zero());
-            }
-        }
-        let c = Arc::new(Mutex::new(c_));
-        let cam_arc = Arc::new(cam);
+        let mut c = vec![vector::Vector::new_zero(); (w*h) as usize];
 
         let mut pool = Pool::new(4);
-        pool.scoped(|scope| {
-            for y in 0 .. h
+        pool.scoped(|scope|
+        {
+            for (row, c2) in c.chunks_mut(w as usize).enumerate()
             {
-                let mut c_ref = c.clone();
-                let cam_copy = cam_arc.clone();
+                let cam = &cam;
+                let y = h - row as u32;
                 scope.execute(move || {
                     println!("Rendering {} spp, {1:.3} %", samps*4, 100.0 * (y as f64)/(h as f64 - 1.0));
                     for x in 0 .. w
                     {
-                        let i = (h-y-1)*w+x;
                         for sy in 0 .. 2
                         {
                             for sx in 0 .. 2
@@ -206,20 +193,18 @@ impl Tracer
 
                                     let fx = ((sxf64 + 0.5 + dxf64)/2.0 + xf64)/wf64 - 0.5;
                                     let fy = ((syf64 + 0.5 + dyf64)/2.0 + yf64)/hf64 - 0.5;
-                                    let d = cx * fx + cy * fy + cam_copy.d;
-                                    r = r + self.radiance(&ray::Ray::new(cam_copy.o + d * 140.0, d.norm()))*(1.0/samps as f64);
+                                    let d = cx * fx + cy * fy + cam.d;
+                                    r = r + self.radiance(&ray::Ray::new(cam.o + d * 140.0, d.norm()))*(1.0/samps as f64);
                                 }
-                                let mut c2 = c_ref.lock().unwrap();
-                                let new_value = c2[i as usize] + vector::Vector::new(clamp(r.x),clamp(r.y),clamp(r.z))* 0.25;
-                                c2[i as usize] = new_value;
+                                let new_value = c2[x as usize] + vector::Vector::new(clamp(r.x),clamp(r.y),clamp(r.z))* 0.25;
+                                c2[x as usize] = new_value;
                             }
                         }
                     }
                 });
             }
         });
-        let w = c.lock().unwrap().clone();
-        return w;
+        return c;
     }
 
     #[allow(dead_code)]
