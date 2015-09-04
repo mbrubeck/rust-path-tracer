@@ -5,6 +5,7 @@ mod sphere;
 
 use rand;
 use rand::Rng;
+use rand::thread_rng;
 use scoped_threadpool::Pool;
 use std::f64::consts::PI;
 use std::cell::RefCell;
@@ -14,16 +15,13 @@ use std::sync::Arc;
 struct Tracer
 {
     spheres : Vec<sphere::Sphere>,
-    rng : Mutex<RefCell<rand::StdRng>>,
 }
 
 impl Tracer
 {
     fn generate_random_float(&self) -> f64
     {
-        let ref_cell_rng = self.rng.lock().unwrap();
-        let nb = ref_cell_rng.borrow_mut().next_f64();
-        return nb;
+        thread_rng().gen()
     }
 
     #[allow(dead_code)]
@@ -297,7 +295,6 @@ pub fn generate_image(w : u32, h : u32, samps : u32) -> Vec<vector::Vector>
     let tr = Tracer
     {
         spheres : build_sphere(),
-        rng : Mutex::new(RefCell::new(rand::StdRng::new().unwrap())),
     };
     tr.compute(w, h, samps)
 }
